@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#4f46e5" />
+  <title>Raspador Google Places — Prospecção</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg-soft: #1e293b;
+      --card: #ffffff;
+      --ink: #0f172a;
+      --ink-soft: #64748b;
+      --line: #e2e8f0;
+      --brand: #4f46e5;
+      --brand-2: #7c3aed;
+      --ok: #16a34a;
+      --danger: #dc2626;
+      --radius: 16px;
+      --shadow: 0 10px 30px rgba(2, 6, 23, 0.12);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--ink);
+      background: linear-gradient(160deg, #4f46e5 0%, #7c3aed 45%, #0f172a 100%);
+      background-attachment: fixed;
+      min-height: 100vh;
+      padding: 16px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .wrap { max-width: 1000px; margin: 0 auto; }
+
+    header {
+      text-align: center;
+      color: #fff;
+      padding: 18px 8px 22px;
+    }
+    header .logo {
+      font-size: 38px;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+    header h1 {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+    }
+    header p {
+      font-size: 14px;
+      opacity: 0.85;
+      margin-top: 6px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+    .hint { font-size: 12px; color: var(--ink-soft); font-weight: 400; margin-top: 4px; }
+
+    .field { margin-bottom: 14px; }
+
+    input[type="text"], input[type="password"], input[type="number"], select {
+      width: 100%;
+      padding: 13px 14px;
+      font-size: 16px; /* >=16px evita zoom no iOS */
+      border: 1.5px solid var(--line);
+      border-radius: 12px;
+      background: #f8fafc;
+      color: var(--ink);
+      transition: border-color .15s, box-shadow .15s;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+      background: #fff;
+    }
+
+    .key-row { display: flex; gap: 8px; }
+    .key-row input { flex: 1; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 13px 16px;
+      font-size: 15px;
+      font-weight: 700;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: transform .08s, opacity .15s, background .15s;
+      white-space: nowrap;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .btn-primary {
+      width: 100%;
+      color: #fff;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      font-size: 16px;
+      padding: 15px;
+    }
+    .btn-ghost {
+      background: #f1f5f9;
+      color: var(--ink);
+      padding: 13px 14px;
+    }
+    .btn-csv { background: #ecfdf5; color: #047857; border: 1.5px solid #a7f3d0; }
+    .btn-json { background: #eff6ff; color: #1d4ed8; border: 1.5px solid #bfdbfe; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    .export-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .export-row .btn { flex: 1; min-width: 140px; }
+
+    /* Resultados */
+    .results-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .results-head h2 { font-size: 17px; }
+    .badge {
+      background: var(--brand);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 4px 11px;
+      border-radius: 999px;
+    }
+
+    /* Tabela em telas grandes */
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    thead th {
+      text-align: left;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: var(--ink-soft);
+      padding: 10px 12px;
+      border-bottom: 2px solid var(--line);
+      white-space: nowrap;
+    }
+    tbody td { padding: 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    tbody tr:hover { background: #f8fafc; }
+    .biz-name { font-weight: 700; }
+    a.link { color: var(--brand); text-decoration: none; word-break: break-all; }
+    a.link:hover { text-decoration: underline; }
+    .muted { color: var(--ink-soft); }
+    .chip {
+      display: inline-block;
+      background: #f1f5f9;
+      color: #475569;
+      font-size: 12px;
+      padding: 2px 9px;
+      border-radius: 999px;
+    }
+
+    /* Estados */
+    #status { text-align: center; padding: 8px 0 4px; }
+    .spinner {
+      width: 34px; height: 34px;
+      border: 3.5px solid rgba(79,70,229,0.2);
+      border-top-color: var(--brand);
+      border-radius: 50%;
+      margin: 8px auto;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .alert {
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 14px;
+      margin-top: 4px;
+      text-align: left;
+    }
+    .alert-error { background: #fef2f2; color: var(--danger); border: 1px solid #fecaca; }
+    .alert-info { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+    .empty { text-align: center; color: var(--ink-soft); padding: 30px 10px; }
+    .empty .em { font-size: 40px; }
+
+    footer { text-align: center; color: rgba(255,255,255,0.75); font-size: 12px; padding: 8px 0 20px; }
+    footer a { color: #fff; }
+
+    /* ===== Mobile first: cards no lugar da tabela ===== */
+    @media (max-width: 680px) {
+      .table-scroll thead { display: none; }
+      .table-scroll table, .table-scroll tbody, .table-scroll tr, .table-scroll td { display: block; width: 100%; }
+      .table-scroll tr {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 6px 4px;
+        margin-bottom: 12px;
+      }
+      .table-scroll td { border-bottom: 1px solid #f1f5f9; padding: 9px 12px; }
+      .table-scroll tr:hover { background: #fff; }
+      .table-scroll td:last-child { border-bottom: none; }
+      .table-scroll td::before {
+        content: attr(data-label);
+        display: block;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: var(--ink-soft);
+        font-weight: 700;
+        margin-bottom: 3px;
+      }
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logo">📍</div>
+      <h1>Raspador Google Places</h1>
+      <p>Pesquise negócios no Google Maps e exporte para CSV ou JSON</p>
+    </header>
+
+    <!-- Configuração -->
+    <section class="card">
+      <div class="field">
+        <label for="apiKey">🔑 Sua chave da API do Google Places</label>
+        <div class="key-row">
+          <input type="password" id="apiKey" placeholder="Cole sua chave aqui (AIza...)" autocomplete="off" spellcheck="false" />
+          <button class="btn btn-ghost" id="toggleKey" type="button" title="Mostrar/ocultar">👁️</button>
+        </div>
+        <p class="hint">A chave fica salva só no seu navegador (localStorage). Nada é enviado a outro servidor além do Google.</p>
+      </div>
+
+      <div class="field">
+        <label for="query">🔎 O que você quer pesquisar?</label>
+        <input type="text" id="query" placeholder="Ex.: salão de beleza na Penha, Rio de Janeiro" />
+      </div>
+
+      <div class="grid-2">
+        <div class="field">
+          <label for="pages">Páginas (20 por página)</label>
+          <select id="pages">
+            <option value="1">1 página (~20)</option>
+            <option value="2">2 páginas (~40)</option>
+            <option value="3" selected>3 páginas (~60)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="region">Região / Idioma</label>
+          <select id="region">
+            <option value="br" selected>Brasil (pt-BR)</option>
+            <option value="pt">Portugal (pt-PT)</option>
+            <option value="us">EUA (en-US)</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="searchBtn" type="button">🚀 Pesquisar negócios</button>
+    </section>
+
+    <div id="status"></div>
+
+    <!-- Resultados -->
+    <section class="card" id="resultsCard" style="display:none;">
+      <div class="results-head">
+        <h2>Resultados <span class="badge" id="count">0</span></h2>
+        <div class="export-row">
+          <button class="btn btn-csv" id="exportCsv" type="button">⬇️ CSV (planilha)</button>
+          <button class="btn btn-json" id="exportJson" type="button">⬇️ JSON</button>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Telefone</th>
+              <th>Nicho</th>
+              <th>Endereço</th>
+              <th>Website</th>
+              <th>Avaliação</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      Feito para prospecção • Usa a <strong>Places API (New)</strong> do Google ·
+      <a href="README.md">Como criar a chave?</a>
+    </footer>
+  </div>
+
+  <script>
+    "use strict";
+
+    // ====== Endpoint atualizado: Places API (New) ======
+    const ENDPOINT = "https://places.googleapis.com/v1/places:searchText";
+
+    // Campos solicitados ao Google (Field Mask obrigatório na API nova).
+    const FIELD_MASK = [
+      "places.id",
+      "places.displayName",
+      "places.formattedAddress",
+      "places.nationalPhoneNumber",
+      "places.internationalPhoneNumber",
+      "places.websiteUri",
+      "places.primaryTypeDisplayName",
+      "places.primaryType",
+      "places.rating",
+      "places.userRatingCount",
+      "places.googleMapsUri",
+      "places.location",
+      "nextPageToken"
+    ].join(",");
+
+    const REGIONS = {
+      br: { regionCode: "BR", languageCode: "pt-BR" },
+      pt: { regionCode: "PT", languageCode: "pt-PT" },
+      us: { regionCode: "US", languageCode: "en-US" }
+    };
+
+    // ====== Elementos ======
+    const $ = (id) => document.getElementById(id);
+    const apiKeyEl = $("apiKey");
+    const queryEl = $("query");
+    const statusEl = $("status");
+    const resultsCard = $("resultsCard");
+    const tbody = $("tbody");
+    const countEl = $("count");
+
+    let lastResults = [];
+    let lastQuery = "";
+
+    // ====== Persistência da chave ======
+    apiKeyEl.value = localStorage.getItem("gplaces_key") || "";
+    apiKeyEl.addEventListener("input", () => {
+      localStorage.setItem("gplaces_key", apiKeyEl.value.trim());
+    });
+    $("toggleKey").addEventListener("click", () => {
+      apiKeyEl.type = apiKeyEl.type === "password" ? "text" : "password";
+    });
+
+    // ====== Helpers de UI ======
+    function setStatus(html) { statusEl.innerHTML = html; }
+    function clearStatus() { statusEl.innerHTML = ""; }
+    function showError(msg) {
+      setStatus(`<div class="alert alert-error">⚠️ ${msg}</div>`);
+    }
+
+    // ====== Busca com paginação ======
+    async function searchPlaces(query, apiKey, maxPages, regionKey) {
+      const region = REGIONS[regionKey] || REGIONS.br;
+      const collected = [];
+      let pageToken = null;
+
+      for (let page = 0; page < maxPages; page++) {
+        const body = {
+          textQuery: query,
+          pageSize: 20,
+          languageCode: region.languageCode,
+          regionCode: region.regionCode
+        };
+        if (pageToken) body.pageToken = pageToken;
+
+        const resp = await fetch(ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": apiKey,
+            "X-Goog-FieldMask": FIELD_MASK
+          },
+          body: JSON.stringify(body)
+        });
+
+        const data = await resp.json().catch(() => ({}));
+
+        if (!resp.ok) {
+          const apiMsg = (data && data.error && data.error.message) || `HTTP ${resp.status}`;
+          throw new Error(apiMsg);
+        }
+
+        if (Array.isArray(data.places)) collected.push(...data.places);
+
+        pageToken = data.nextPageToken || null;
+        if (!pageToken) break;
+
+        // A API nova exige um pequeno intervalo para o token ficar válido.
+        if (page < maxPages - 1) await new Promise(r => setTimeout(r, 1800));
+      }
+      return collected;
+    }
+
+    // ====== Normaliza um "place" para o formato de exportação ======
+    function normalize(place) {
+      return {
+        nome: place.displayName?.text || "",
+        telefone: place.nationalPhoneNumber || place.internationalPhoneNumber || "",
+        nicho: place.primaryTypeDisplayName?.text || place.primaryType || "",
+        endereco: place.formattedAddress || "",
+        website: place.websiteUri || "",
+        avaliacao: place.rating != null ? place.rating : "",
+        total_avaliacoes: place.userRatingCount != null ? place.userRatingCount : "",
+        google_maps: place.googleMapsUri || "",
+        latitude: place.location?.latitude ?? "",
+        longitude: place.location?.longitude ?? "",
+        place_id: place.id || ""
+      };
+    }
+
+    // ====== Render ======
+    function render(rows) {
+      tbody.innerHTML = "";
+      if (rows.length === 0) {
+        resultsCard.style.display = "block";
+        countEl.textContent = "0";
+        tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="em">🤷</div>Nenhum resultado. Tente outra busca.</div></td></tr>`;
+        return;
+      }
+
+      const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+
+      for (const r of rows) {
+        const tel = r.telefone
+          ? `<a class="link" href="tel:${esc(r.telefone.replace(/\s/g,''))}">${esc(r.telefone)}</a>`
+          : '<span class="muted">—</span>';
+        const site = r.website
+          ? `<a class="link" href="${esc(r.website)}" target="_blank" rel="noopener">${esc(r.website.replace(/^https?:\/\//,''))}</a>`
+          : '<span class="muted">—</span>';
+        const aval = r.avaliacao !== ""
+          ? `⭐ ${esc(r.avaliacao)} <span class="muted">(${esc(r.total_avaliacoes || 0)})</span>`
+          : '<span class="muted">—</span>';
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td data-label="Nome"><span class="biz-name">${esc(r.nome) || "—"}</span></td>
+          <td data-label="Telefone">${tel}</td>
+          <td data-label="Nicho"><span class="chip">${esc(r.nicho) || "—"}</span></td>
+          <td data-label="Endereço">${esc(r.endereco) || '<span class="muted">—</span>'}</td>
+          <td data-label="Website">${site}</td>
+          <td data-label="Avaliação">${aval}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+
+      countEl.textContent = String(rows.length);
+      resultsCard.style.display = "block";
+    }
+
+    // ====== Exportações ======
+    function download(filename, content, mime) {
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function slugify(s) {
+      return (s || "google-places").toLowerCase()
+        .normalize("NFD").replace(/[̀-ͯ]/g, "")
+        .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50) || "resultados";
+    }
+
+    function toCSV(rows) {
+      const headers = ["nome","telefone","nicho","endereco","website","avaliacao","total_avaliacoes","google_maps","latitude","longitude","place_id"];
+      const escapeCell = (v) => {
+        const s = v == null ? "" : String(v);
+        return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+      };
+      const lines = [headers.join(",")];
+      for (const r of rows) lines.push(headers.map(h => escapeCell(r[h])).join(","));
+      // BOM para acentos abrirem certos no Excel.
+      return "﻿" + lines.join("\r\n");
+    }
+
+    $("exportCsv").addEventListener("click", () => {
+      if (!lastResults.length) return;
+      download(`${slugify(lastQuery)}.csv`, toCSV(lastResults), "text/csv;charset=utf-8;");
+    });
+    $("exportJson").addEventListener("click", () => {
+      if (!lastResults.length) return;
+      download(`${slugify(lastQuery)}.json`, JSON.stringify(lastResults, null, 2), "application/json;charset=utf-8;");
+    });
+
+    // ====== Ação principal ======
+    async function runSearch() {
+      const apiKey = apiKeyEl.value.trim();
+      const query = queryEl.value.trim();
+
+      if (!apiKey) { showError("Cole sua chave da API do Google Places primeiro."); return; }
+      if (!query) { showError("Digite o que deseja pesquisar."); return; }
+
+      const maxPages = parseInt($("pages").value, 10) || 1;
+      const regionKey = $("region").value;
+
+      $("searchBtn").disabled = true;
+      resultsCard.style.display = "none";
+      setStatus('<div class="spinner"></div><div class="muted">Buscando no Google Maps…</div>');
+
+      try {
+        const places = await searchPlaces(query, apiKey, maxPages, regionKey);
+        lastResults = places.map(normalize);
+        lastQuery = query;
+        render(lastResults);
+        clearStatus();
+        if (lastResults.length) {
+          setStatus(`<div class="alert alert-info">✅ ${lastResults.length} negócio(s) encontrado(s). Use os botões acima para exportar.</div>`);
+        }
+      } catch (err) {
+        let msg = err.message || "Falha desconhecida.";
+        if (/API key|API_KEY|invalid|denied|PERMISSION/i.test(msg)) {
+          msg += " — Verifique se a chave é válida e se a <strong>Places API (New)</strong> está ativada no Google Cloud.";
+        }
+        if (/Failed to fetch|NetworkError/i.test(msg)) {
+          msg = "Não consegui conectar ao Google. Verifique sua internet e as restrições da chave (referenciadores HTTP).";
+        }
+        showError(msg);
+      } finally {
+        $("searchBtn").disabled = false;
+      }
+    }
+
+    $("searchBtn").addEventListener("click", runSearch);
+    queryEl.addEventListener("keydown", (e) => { if (e.key === "Enter") runSearch(); });
+  </script>
+</body>
+</html>
