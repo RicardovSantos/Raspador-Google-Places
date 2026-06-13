@@ -39,19 +39,16 @@ CHAVE_API = ""
 ENDPOINT = "https://places.googleapis.com/v1/places:searchText"
 
 # Field Mask é OBRIGATÓRIO na API nova: define quais campos voltam.
+# addressComponents traz o endereço estruturado (bairro, cidade) separado.
 FIELD_MASK = ",".join([
-    "places.id",
     "places.displayName",
-    "places.formattedAddress",
     "places.nationalPhoneNumber",
     "places.internationalPhoneNumber",
     "places.websiteUri",
     "places.primaryTypeDisplayName",
     "places.primaryType",
-    "places.rating",
-    "places.userRatingCount",
-    "places.googleMapsUri",
-    "places.location",
+    "places.addressComponents",
+    "places.formattedAddress",
     "nextPageToken",
 ])
 
@@ -61,11 +58,7 @@ REGIOES = {
     "us": {"regionCode": "US", "languageCode": "en-US"},
 }
 
-COLUNAS = [
-    "nome", "telefone", "nicho", "endereco", "website",
-    "avaliacao", "total_avaliacoes", "google_maps",
-    "latitude", "longitude", "place_id",
-]
+COLUNAS = ["name", "phone", "category", "city", "county", "website"]
 
 
 def obter_chave(arg_chave: str | None) -> str:
@@ -131,20 +124,29 @@ def buscar(query: str, chave: str, paginas: int, regiao: str) -> list[dict]:
     return coletados
 
 
+def pegar_componente(componentes: list, tipos: list[str]) -> str:
+    """Retorna o primeiro componente de endereço que casa com a prioridade de tipos."""
+    if not componentes:
+        return ""
+    for t in tipos:
+        for c in componentes:
+            if t in (c.get("types") or []):
+                return c.get("longText") or c.get("shortText") or ""
+    return ""
+
+
 def normalizar(p: dict) -> dict:
-    loc = p.get("location") or {}
+    comps = p.get("addressComponents") or []
+    # county = só o bairro (não o endereço completo)
+    bairro = pegar_componente(comps, ["sublocality_level_1", "sublocality", "neighborhood", "administrative_area_level_4"])
+    cidade = pegar_componente(comps, ["locality", "administrative_area_level_2", "postal_town"])
     return {
-        "nome": (p.get("displayName") or {}).get("text", ""),
-        "telefone": p.get("nationalPhoneNumber") or p.get("internationalPhoneNumber") or "",
-        "nicho": (p.get("primaryTypeDisplayName") or {}).get("text") or p.get("primaryType", ""),
-        "endereco": p.get("formattedAddress", ""),
+        "name": (p.get("displayName") or {}).get("text", ""),
+        "phone": p.get("nationalPhoneNumber") or p.get("internationalPhoneNumber") or "",
+        "category": (p.get("primaryTypeDisplayName") or {}).get("text") or p.get("primaryType", ""),
+        "city": cidade,
+        "county": bairro,
         "website": p.get("websiteUri", ""),
-        "avaliacao": p.get("rating", ""),
-        "total_avaliacoes": p.get("userRatingCount", ""),
-        "google_maps": p.get("googleMapsUri", ""),
-        "latitude": loc.get("latitude", ""),
-        "longitude": loc.get("longitude", ""),
-        "place_id": p.get("id", ""),
     }
 
 

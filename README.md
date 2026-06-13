@@ -1,8 +1,9 @@
 # 📍 Raspador Google Places
 
 Pesquise negócios no Google Maps (ex.: *salão de beleza na Penha*) e exporte os dados
-— **nome, telefone, nicho, endereço, website, avaliação** — em **CSV** (planilha) ou **JSON**
-prontos para importar no seu app de prospecção.
+em **CSV** (planilha) ou **JSON** prontos para importar no seu app de prospecção.
+
+**Campos exportados:** `name`, `phone`, `category`, `city`, `county` (bairro), `website`.
 
 Funciona com a **Places API (New)** do Google — o padrão atual e atualizado.
 

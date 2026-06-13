@@ -295,10 +295,10 @@
             <tr>
               <th>Nome</th>
               <th>Telefone</th>
-              <th>Nicho</th>
-              <th>Endereço</th>
+              <th>Categoria</th>
+              <th>Cidade</th>
+              <th>Bairro</th>
               <th>Website</th>
-              <th>Avaliação</th>
             </tr>
           </thead>
           <tbody id="tbody"></tbody>
@@ -319,19 +319,16 @@
     const ENDPOINT = "https://places.googleapis.com/v1/places:searchText";
 
     // Campos solicitados ao Google (Field Mask obrigatório na API nova).
+    // addressComponents traz o endereço estruturado (bairro, cidade) separado.
     const FIELD_MASK = [
-      "places.id",
       "places.displayName",
-      "places.formattedAddress",
       "places.nationalPhoneNumber",
       "places.internationalPhoneNumber",
       "places.websiteUri",
       "places.primaryTypeDisplayName",
       "places.primaryType",
-      "places.rating",
-      "places.userRatingCount",
-      "places.googleMapsUri",
-      "places.location",
+      "places.addressComponents",
+      "places.formattedAddress",
       "nextPageToken"
     ].join(",");
 
@@ -412,20 +409,29 @@
       return collected;
     }
 
+    // Extrai um componente do endereço por ordem de prioridade de tipos.
+    function pickComponent(components, types) {
+      if (!Array.isArray(components)) return "";
+      for (const t of types) {
+        const c = components.find(comp => Array.isArray(comp.types) && comp.types.includes(t));
+        if (c) return c.longText || c.shortText || "";
+      }
+      return "";
+    }
+
     // ====== Normaliza um "place" para o formato de exportação ======
     function normalize(place) {
+      const comps = place.addressComponents;
+      // county = só o bairro (não o endereço completo)
+      const county = pickComponent(comps, ["sublocality_level_1", "sublocality", "neighborhood", "administrative_area_level_4"]);
+      const city = pickComponent(comps, ["locality", "administrative_area_level_2", "postal_town"]);
       return {
-        nome: place.displayName?.text || "",
-        telefone: place.nationalPhoneNumber || place.internationalPhoneNumber || "",
-        nicho: place.primaryTypeDisplayName?.text || place.primaryType || "",
-        endereco: place.formattedAddress || "",
-        website: place.websiteUri || "",
-        avaliacao: place.rating != null ? place.rating : "",
-        total_avaliacoes: place.userRatingCount != null ? place.userRatingCount : "",
-        google_maps: place.googleMapsUri || "",
-        latitude: place.location?.latitude ?? "",
-        longitude: place.location?.longitude ?? "",
-        place_id: place.id || ""
+        name: place.displayName?.text || "",
+        phone: place.nationalPhoneNumber || place.internationalPhoneNumber || "",
+        category: place.primaryTypeDisplayName?.text || place.primaryType || "",
+        city: city,
+        county: county,
+        website: place.websiteUri || ""
       };
     }
 
@@ -442,24 +448,21 @@
       const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
 
       for (const r of rows) {
-        const tel = r.telefone
-          ? `<a class="link" href="tel:${esc(r.telefone.replace(/\s/g,''))}">${esc(r.telefone)}</a>`
+        const tel = r.phone
+          ? `<a class="link" href="tel:${esc(r.phone.replace(/\s/g,''))}">${esc(r.phone)}</a>`
           : '<span class="muted">—</span>';
         const site = r.website
           ? `<a class="link" href="${esc(r.website)}" target="_blank" rel="noopener">${esc(r.website.replace(/^https?:\/\//,''))}</a>`
           : '<span class="muted">—</span>';
-        const aval = r.avaliacao !== ""
-          ? `⭐ ${esc(r.avaliacao)} <span class="muted">(${esc(r.total_avaliacoes || 0)})</span>`
-          : '<span class="muted">—</span>';
 
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td data-label="Nome"><span class="biz-name">${esc(r.nome) || "—"}</span></td>
+          <td data-label="Nome"><span class="biz-name">${esc(r.name) || "—"}</span></td>
           <td data-label="Telefone">${tel}</td>
-          <td data-label="Nicho"><span class="chip">${esc(r.nicho) || "—"}</span></td>
-          <td data-label="Endereço">${esc(r.endereco) || '<span class="muted">—</span>'}</td>
+          <td data-label="Categoria"><span class="chip">${esc(r.category) || "—"}</span></td>
+          <td data-label="Cidade">${esc(r.city) || '<span class="muted">—</span>'}</td>
+          <td data-label="Bairro">${esc(r.county) || '<span class="muted">—</span>'}</td>
           <td data-label="Website">${site}</td>
-          <td data-label="Avaliação">${aval}</td>
         `;
         tbody.appendChild(tr);
       }
@@ -488,7 +491,7 @@
     }
 
     function toCSV(rows) {
-      const headers = ["nome","telefone","nicho","endereco","website","avaliacao","total_avaliacoes","google_maps","latitude","longitude","place_id"];
+      const headers = ["name","phone","category","city","county","website"];
       const escapeCell = (v) => {
         const s = v == null ? "" : String(v);
         return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
