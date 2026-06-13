@@ -177,7 +177,7 @@ def main() -> None:
     )
     parser.add_argument("query", help='O que pesquisar. Ex.: "salão de beleza na Penha"')
     parser.add_argument("--paginas", "--pages", type=int, default=3, dest="paginas",
-                        help="Quantas páginas buscar (20 por página). Padrão: 3")
+                        help="Quantas páginas buscar (20 por página, máx. 6 = ~120). Padrão: 3")
     parser.add_argument("--formato", choices=["csv", "json", "ambos"], default="ambos",
                         help="Formato de exportação. Padrão: ambos")
     parser.add_argument("--regiao", choices=["br", "pt", "us"], default="br",
@@ -188,7 +188,7 @@ def main() -> None:
     args = parser.parse_args()
 
     chave = obter_chave(args.chave)
-    paginas = max(1, min(args.paginas, 3))  # a API entrega no máx. ~60 resultados (3 páginas)
+    paginas = max(1, min(args.paginas, 6))  # até 6 páginas (~120 resultados)
 
     print(f"🔎 Pesquisando: {args.query!r}")
     brutos = buscar(args.query, chave, paginas, args.regiao)
